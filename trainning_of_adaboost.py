@@ -1,7 +1,21 @@
 import numpy as np
 import methods
 import svm
-def fit(X, y, M = 10, C = None , instance_categorization = False, proposed_preprocessing = False,proposed_alpha = False, test_something = True, theta = 1):
+
+
+def fit(
+    X,
+    y,
+    M=10,
+    C=None,
+    instance_categorization=False,
+    proposed_preprocessing=False,
+    proposed_alpha=False,
+    test_something=True,
+    theta=1,
+    use_entropy_init=False,
+    use_noise_robust_confident=False,
+):
     '''
     Input:
         X: data
@@ -13,7 +27,10 @@ def fit(X, y, M = 10, C = None , instance_categorization = False, proposed_prepr
     #Xac dinh number of data va length of feature
     N, d = X.shape
     # initial weight adjustment and instance categorization
-    W_ada = methods.intinitialization_weight_adjustment(X, y, proposed_preprocessing, theta)
+    if use_entropy_init:
+        W_ada = methods.entropy_init_weight(X, y, proposed=proposed_preprocessing)
+    else:
+        W_ada = methods.intinitialization_weight_adjustment(X, y, proposed_preprocessing, theta)
     # W_ada = methods.intinitialization_weight_adjustment(N)
     #Creat list of each models svm after adaboost
     w = []
@@ -39,7 +56,17 @@ def fit(X, y, M = 10, C = None , instance_categorization = False, proposed_prepr
             true_index, false_index,false_index_P,false_index_N = methods.find_true_false_index(y, pred_i)
             # Compute i-th confident and append to the alpha
             # alpha_i = methods.confident(W_ada,false_index_P,false_index_N,proposed_alpha) #Gốc
-            alpha_i, D_i = methods.confident(W_ada,false_index_P,false_index_N,proposed_alpha)
+            if use_noise_robust_confident:
+                alpha_i, D_i = methods.noise_robust_confident(
+                    X,
+                    y,
+                    W_ada,
+                    false_index_P,
+                    false_index_N,
+                    proposed_alpha=proposed_alpha,
+                )
+            else:
+                alpha_i, D_i = methods.confident(W_ada,false_index_P,false_index_N,proposed_alpha)
             alpha.append(alpha_i)
             
             # Update weight adjustment and instance categorization
@@ -62,7 +89,17 @@ def fit(X, y, M = 10, C = None , instance_categorization = False, proposed_prepr
             true_index, false_index,false_index_P,false_index_N = methods.find_true_false_index(y, pred_i)
             # Compute i-th confident and append to the alpha
             # alpha_i = methods.confident(W_ada,false_index_P,false_index_N,proposed_alpha) #Gốc
-            alpha_i, D_i = methods.confident(W_ada,false_index_P,false_index_N,proposed_alpha)
+            if use_noise_robust_confident:
+                alpha_i, D_i = methods.noise_robust_confident(
+                    X,
+                    y,
+                    W_ada,
+                    false_index_P,
+                    false_index_N,
+                    proposed_alpha=proposed_alpha,
+                )
+            else:
+                alpha_i, D_i = methods.confident(W_ada,false_index_P,false_index_N,proposed_alpha)
             alpha.append(alpha_i)
             
             # Update weight adjustment

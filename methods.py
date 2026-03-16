@@ -28,6 +28,54 @@ def intinitialization_weight_adjustment(X, y, proposed, theta):
     else:
         w = np.ones(N)/N
     return w #shape(N, )
+
+def entropy_init_weight(X, y, proposed=True):
+    """
+    Khởi tạo trọng số Parameter-Free Im.AdaBoost sử dụng Shannon Entropy.
+    Không còn cần tham số theta.
+    """
+    N, d = X.shape 
+    w = np.ones(N) / N
+
+    if proposed:
+        # Tự động đếm và phân loại lớp thiểu số (min) / đa số (maj)
+        labels, counts = np.unique(y, return_counts=True)
+        
+        # Nếu dữ liệu chỉ có 1 lớp (tránh lỗi logic)
+        if len(labels) < 2:
+            return w
+            
+        min_idx = np.argmin(counts)
+        maj_idx = np.argmax(counts)
+        
+        N_min = counts[min_idx]
+        N_maj = counts[maj_idx]
+        min_label = labels[min_idx]
+        maj_label = labels[maj_idx]
+        
+        # 1. Tính xác suất P_min và P_maj
+        P_min = N_min / N
+        P_maj = N_maj / N
+        
+        # 2. Tính Shannon Entropy (E)
+        # Sử dụng công thức: E = -(P_min * ln(P_min) + P_maj * ln(P_maj))
+        E = -(P_min * np.log(P_min) + P_maj * np.log(P_maj))
+        
+        # 3. Tính Hệ số Bù trừ Thích nghi (\lambda_auto)
+        lambda_auto = 1 - (E / np.log(2))
+        
+        # 4. Tính tỷ lệ chênh lệch \delta (tương đương với 'eps' ở code cũ)
+        delta_ratio = N_min / N_maj
+        
+        # 5. Tính lượng bù trừ \Delta cho hai lớp
+        delta_maj = lambda_auto / N
+        delta_min = lambda_auto / (delta_ratio * N)
+        
+        # 6. Cập nhật trọng số vào mảng w
+        w[y == min_label] = (1 / N) + delta_min
+        w[y == maj_label] = (1 / N) - delta_maj
+
+    return w # shape(N, )
     
 # =============================================================================
 # def intinitialization_weight_adjustment(X, y, proposed):
@@ -137,8 +185,79 @@ def confident(W,  false_index_P,false_index_N, proposed_alpha):
         else:
             return 1,1
 
+from sklearn.neighbors import NearestNeighbors
 
+def noise_robust_confident(X, y, W, false_index_P, false_index_N, proposed_alpha=True, K=5):
+    '''
+    Hàm tính toán độ tin cậy kháng nhiễu (Noise-Robust Confident) bằng KNN.
+    Input: 
+        X, y: Dữ liệu và nhãn để chạy KNN quét vùng nhiễu.
+        W: Trọng số (N, 1)
+        false_index_P: index các mẫu DƯƠNG bị đoán sai
+        false_index_N: index các mẫu ÂM bị đoán sai
+        K: Số láng giềng để xét nhiễu (Mặc định = 5)
+    '''
+    if proposed_alpha is True:
+        esp_N = np.sum(W[false_index_N])
+        
+        esp_P_safe = 0
+        esp_P_noisy = 0
+        
+        # Tiền xử lý: Phân loại nhiễu bằng KNN cho các mẫu dương bị sai
+        if len(false_index_P) > 0:
+            # Dùng NearestNeighbors thay vì KNeighborsClassifier để chạy nhanh hơn
+            # k=K+1 vì láng giềng gần nhất luôn là chính nó (khoảng cách = 0)
+            nn = NearestNeighbors(n_neighbors=K+1)
+            nn.fit(X)
+            
+            # Chỉ lấy các điểm dương dự đoán sai ra để đối chiếu
+            distances, indices = nn.kneighbors(X[false_index_P])
+            
+            safe_P_indices = []
+            noisy_P_indices = []
+            
+            for i, idx in enumerate(false_index_P):
+                # Bỏ qua index đầu tiên vì đó là chính nó
+                neighbor_indices = indices[i][1:]
+                neighbor_labels = y[neighbor_indices]
+                
+                # Đếm số lượng láng giềng mang nhãn ÂM (-1)
+                negative_count = np.sum(neighbor_labels == -1)
+                
+                # Nếu quá nửa láng giềng là Âm -> Điểm này bị nhiễu (Lọt thỏm trong vùng âm)
+                if negative_count > (K / 2):
+                    noisy_P_indices.append(idx)
+                else:
+                    safe_P_indices.append(idx)
+            
+            # Tính tổng trọng số lỗi cho 2 nhóm riêng biệt
+            esp_P_safe = np.sum(W[safe_P_indices]) if len(safe_P_indices) > 0 else 0
+            esp_P_noisy = np.sum(W[noisy_P_indices]) if len(noisy_P_indices) > 0 else 0
 
+        # Tổng lỗi thực tế
+        E_total = esp_N + esp_P_safe + esp_P_noisy
+        
+        if E_total > 0:
+            # CÔNG THỨC CHỌN LỌC PHẠT (Selective Penalty)
+            # Chỉ khuếch đại lỗi cho nhóm 'esp_P_safe'
+            eps = E_total + esp_P_safe * (1 - E_total)
+            
+            # Bảo vệ để tránh lỗi toán học khi tính log (nếu eps >= 1)
+            if eps >= 1: eps = 0.9999
+                
+            alpha = 1/2 * np.log((1 - eps) / eps)
+            return alpha, eps
+        else:
+            return 1, 1
+            
+    else:
+        # Thuật toán AdaBoost Gốc
+        eps = (np.sum(W[false_index_P]) + np.sum(W[false_index_N])) / np.sum(W)
+        if eps > 0 and eps < 1:
+            alpha = 1/2 * np.log((1 - eps) / eps)
+            return alpha, eps
+        else:
+            return 1, 1
     
 
 def update_weight_adjustment(W, alpha, true_index, false_index):

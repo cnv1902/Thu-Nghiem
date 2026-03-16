@@ -3,7 +3,16 @@ import methods
 import svm
 from sklearn import tree 
 
-def fit(X, y, M = 10, proposed_preprocessing = False, proposed_alpha = False, theta = 1):
+def fit(
+    X,
+    y,
+    M=10,
+    proposed_preprocessing=False,
+    proposed_alpha=False,
+    theta=1,
+    use_entropy_init=False,
+    use_noise_robust_confident=False,
+):
     '''
     Input:
         X: data
@@ -15,7 +24,10 @@ def fit(X, y, M = 10, proposed_preprocessing = False, proposed_alpha = False, th
     #Xac dinh number of data va length of feature
     N, d = X.shape
     # initial weight adjustment and instance categorization
-    W_ada = methods.intinitialization_weight_adjustment(X, y, proposed_preprocessing, theta)
+    if use_entropy_init:
+        W_ada = methods.entropy_init_weight(X, y, proposed=proposed_preprocessing)
+    else:
+        W_ada = methods.intinitialization_weight_adjustment(X, y, proposed_preprocessing, theta)
     
     # W_ada = methods.intinitialization_weight_adjustment(N)
     #Creat list of each models decisiontree after adaboost
@@ -35,7 +47,17 @@ def fit(X, y, M = 10, proposed_preprocessing = False, proposed_alpha = False, th
         true_index, false_index,false_index_P,false_index_N = methods.find_true_false_index(y, pred_i)
         # Compute i-th confident and append to the alpha
         # alpha_i = methods.confident(W_ada,false_index_P,false_index_N,proposed_alpha) #Gốc
-        alpha_i, D_i = methods.confident(W_ada,false_index_P,false_index_N,proposed_alpha)
+        if use_noise_robust_confident:
+            alpha_i, D_i = methods.noise_robust_confident(
+                X,
+                y,
+                W_ada,
+                false_index_P,
+                false_index_N,
+                proposed_alpha=proposed_alpha,
+            )
+        else:
+            alpha_i, D_i = methods.confident(W_ada,false_index_P,false_index_N,proposed_alpha)
         alpha.append(alpha_i)
         
         clfs.append(weak_clf)
