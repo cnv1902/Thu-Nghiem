@@ -6,7 +6,7 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 # from ..common.change_rate_data import  change_rate_data
 from data.common.change_rate_data import change_rate_data
-def load_data(test_size, new_rate):
+def load_data(test_size, new_rate=0.2):
     data = pd.read_csv('D:/research/Thu-Nghiem/data/datasets/Vertebral_column.csv')
     diag_map = {'Abnormal': -1.0, 'Normal': 1.0}
     data['Label class'] = data['Label class'].map(diag_map)

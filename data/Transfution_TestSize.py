@@ -10,7 +10,7 @@ from sklearn.model_selection import KFold
 
 
 def load_data(test_size):
-    dataset = pd.read_csv('D:/research/Thu-Nghiem/data/datasets/transfusion.csv')
+    dataset = pd.read_csv('D:/research/Thu-Nghiem/data/datasets/transfusion_500_0.25.csv')
     transfusion_map = {1:1, 0:-1}
     dataset['whether he/she donated blood in March 2007'] = dataset['whether he/she donated blood in March 2007'].map(transfusion_map)
     X = dataset.iloc[:, :-1].values

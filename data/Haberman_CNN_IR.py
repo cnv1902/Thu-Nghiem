@@ -8,7 +8,7 @@ from collections import Counter
 from keras.utils import to_categorical
 from data.common.change_rate_data import change_rate_data, change_rate_data_cnn
 
-def load_data(test_size,new_rate):
+def load_data(test_size, new_rate=0.2):
     dataset = pd.read_csv('D:/research/Thu-Nghiem/data/datasets/haberman.csv')
     dataset_desc = dataset.describe(include='all')
     haberman_map = {2: 1.0, 1: 0}

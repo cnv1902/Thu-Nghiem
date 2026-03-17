@@ -7,7 +7,7 @@ from sklearn.decomposition import PCA
 from keras.utils import to_categorical
 from data.common.change_rate_data import change_rate_data, change_rate_data_cnn
 
-def load_data(test_size,new_rate):
+def load_data(test_size, new_rate=0.2):
     dataset = pd.read_csv('D:/research/Thu-Nghiem/data/datasets/ecoli_new.csv')
     dataset_desc = dataset.describe(include = 'all')
     # ecoli_map = {' im':1.0, ' cp':-1.0, 'imL':-1.0,'imS':-1.0,'imU':-1.0,' om':-1.0,'omL':-1.0,' pp':-1.0}

@@ -8,7 +8,7 @@ from data.common.change_rate_data import change_rate_data, change_rate_data_cnn
 
 # from common.change_rate_data import change_rate_data
 
-def load_data(test_size,new_rate):
+def load_data(test_size, new_rate=0.2):
     dataset = pd.read_csv('D:/research/Thu-Nghiem/data/datasets/diabetes.csv')
     dataset_desc = dataset.describe(include='all')
     pimaIndians_map = {1: 1, 0: -1}

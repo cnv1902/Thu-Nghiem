@@ -7,7 +7,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 from data.common.change_rate_data import change_rate_data
 
-def load_data(test_size, new_rate):
+def load_data(test_size, new_rate=0.2):
     #load data
     data = pd.read_csv('D:/research/Thu-Nghiem/data/indian_liver_patient.csv')
     Gender_map = {'Female': 0, 'Male': 1.0}

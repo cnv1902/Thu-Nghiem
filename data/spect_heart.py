@@ -3,7 +3,7 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from data.common.change_rate_data import change_rate_data
 
-def load_data(test_size, new_rate):
+def load_data(test_size, new_rate=0.2):
     #read data from csv
     dataset = pd.read_csv('D:/research/Thu-Nghiem/data/datasets/Spect_Heart.csv')
     Dataset_map = {1 : -1, 0: 1}

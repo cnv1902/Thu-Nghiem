@@ -6,7 +6,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from data.common.change_rate_data import change_rate_data
 
-def load_data(test_size, new_rate):
+def load_data(test_size, new_rate=0.2):
     dataset = pd.read_csv('D:/research/Thu-Nghiem/data/datasets/seismic_bumps.csv')
     Dataset_map = {1 : 1, 0: -1}
     dataset['class'] = dataset['class'].map(Dataset_map)

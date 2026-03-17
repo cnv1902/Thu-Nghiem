@@ -9,7 +9,7 @@ from data.common.change_rate_data import change_rate_data, change_rate_data_cnn
 
 
 
-def load_data(test_size,new_rate):
+def load_data(test_size, new_rate=0.2):
     dataset = pd.read_csv('D:/research/Thu-Nghiem/data/datasets/transfusion.csv')
     transfusion_map = {1:1, 0:-1}
     dataset['whether he/she donated blood in March 2007'] = dataset['whether he/she donated blood in March 2007'].map(transfusion_map)

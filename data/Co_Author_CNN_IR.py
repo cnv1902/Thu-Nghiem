@@ -7,7 +7,7 @@ from sklearn.preprocessing import StandardScaler
 from data.common.change_rate_data import change_rate_data, change_rate_data_cnn
 from keras.utils import to_categorical
 
-def load_data(test_size,new_rate): #new_rate
+def load_data(test_size, new_rate=0.2): #new_rate
     data = pd.read_csv('D:/research/Thu-Nghiem/data/datasets/CoAuthor_800_4000.csv')
     diag_map = {-1: 0, 1: 1}
     data['Label'] = data['Label'].map(diag_map)
