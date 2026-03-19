@@ -9,8 +9,8 @@ import pandas as pd
 DEFAULT_INPUT = Path("data/datasets/Software-Faults/jm1.csv")
 
 # Chinh truc tiep cac gia tri nay trong code roi chay file.
-X = 500
-RATE = "0.25"
+X = 2000
+RATE = "0.02"
 SEED = 42
 INPUT_PATH = DEFAULT_INPUT
 OUTPUT_PATH = None
@@ -32,17 +32,14 @@ def compute_class_counts(sample_size: int, rate: Fraction) -> tuple[int, int]:
     if sample_size <= 0:
         raise ValueError("x must be greater than 0.")
 
-    negative_count = Fraction(sample_size, 1) / (1 + rate)
-    positive_count = Fraction(sample_size, 1) - negative_count
+    target_negative = Fraction(sample_size, 1) / (1 + rate)
+    negative_count = int(round(float(target_negative)))
 
-    if negative_count.denominator != 1 or positive_count.denominator != 1:
-        raise ValueError(
-            "x and rate do not produce integer class counts. "
-            "Choose values where x = negative_count + positive_count and "
-            "positive_count / negative_count = rate exactly."
-        )
+    # Keep counts valid and always preserve: positive_count + negative_count == sample_size.
+    negative_count = min(max(negative_count, 0), sample_size)
+    positive_count = sample_size - negative_count
 
-    return int(positive_count), int(negative_count)
+    return positive_count, negative_count
 
 
 def normalize_label(value: object) -> str:

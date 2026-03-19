@@ -13,7 +13,8 @@ def change_rate_data(X, y, new_rate):
     neg_y = np.where( y == -1 )[0]
     rate0 = pos_y.shape[0]/(y.shape[0])
     # pos_y_choosed =int((pos_y.shape[0] - new_rate * y.shape[0])/( 1 -new_rate) ) 
-    pos_y_choosed = int(neg_y.shape[0]*new_rate)
+    pos_y_choosed = int(round(neg_y.shape[0] * float(new_rate)))
+    pos_y_choosed = max(0, min(pos_y_choosed, pos_y.shape[0]))
     pos_y =  pos_y[0:pos_y_choosed]
     print(f"Number of positive_samples: {len(pos_y)}")
     #gop index 
@@ -31,7 +32,8 @@ def change_rate_data_cnn(X, y, new_rate):
     neg_y = np.where( y == 0 )[0]
     rate0 = pos_y.shape[0]/(y.shape[0])
     # pos_y_choosed =int((pos_y.shape[0] - new_rate * y.shape[0])/( 1 -new_rate) ) 
-    pos_y_choosed = int(neg_y.shape[0]*new_rate)
+    pos_y_choosed = int(round(neg_y.shape[0] * float(new_rate)))
+    pos_y_choosed = max(0, min(pos_y_choosed, pos_y.shape[0]))
     pos_y =  pos_y[0:pos_y_choosed]
     #gop index 
     y_index = np.concatenate((pos_y, neg_y), axis = None)
