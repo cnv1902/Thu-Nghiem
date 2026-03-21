@@ -17,6 +17,8 @@ def dual_problem_quadratic_program(X, y, C = None, distribution_weights = None):
         C is a he so danh gia do rong le, is scale
         distribution_weights is a adaboost weight
     '''                                
+    # Ensure y is numpy array (not pandas Series to avoid indexing errors in pandas 2.0+)
+    y = np.asarray(y)
     N, d = X.shape
     # Nhan y vao tung phan tu cua X (Nhan 2 ma tran chu khong nhan ma tran voi vecto)
     # Khai bao P, q
@@ -69,6 +71,9 @@ def svm_weight(X, y, lamda):
 
 # solve bias of svm
 def svm_bias(X, y, S, weight):
+    # If no support vectors found, use all samples to avoid NaN
+    if len(S) == 0:
+        S = np.arange(len(y))
     return np.mean(y[S] - np.dot(X[S],weight))
 
 # predict svm

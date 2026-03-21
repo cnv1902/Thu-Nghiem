@@ -10,7 +10,7 @@ DEFAULT_INPUT = Path("data/datasets/Software-Faults/jm1.csv")
 
 # Chinh truc tiep cac gia tri nay trong code roi chay file.
 X = 2000
-RATE = "0.02"
+RATE = "0.1"
 SEED = 42
 INPUT_PATH = DEFAULT_INPUT
 OUTPUT_PATH = None

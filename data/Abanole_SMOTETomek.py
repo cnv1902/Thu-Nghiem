@@ -38,4 +38,4 @@ def load_data(test_size):
     # CT 2.3: Chỉ áp dụng SMOTETomek trên tập train
     X_train, y_train = apply_smote_tomek(X_train, y_train)
 
-    return X_train, y_train, X_test, y_test
+    return X_train, y_train.to_numpy(), X_test, y_test.to_numpy()
