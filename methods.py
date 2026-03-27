@@ -1,4 +1,114 @@
 import numpy as np
+
+
+def _get_xp(xp=None, *arrays):
+    if xp is not None:
+        return xp
+    try:
+        import cupy as cp
+        if arrays:
+            return cp.get_array_module(*arrays)
+    except Exception:
+        pass
+    return np
+
+
+def _clip_eps(eps, lower=1e-12, upper=1 - 1e-12, xp=None):
+    xp = _get_xp(xp, eps)
+    return xp.clip(eps, lower, upper)
+
+
+def compute_fuzzy_spatial_weight(X, y, delta=1e-6, xp=None):
+    """
+    Fuzzy spatial weight theo cong thuc:
+    f_i = d(x_i, cen_opp) / (d(x_i, cen_own) + d(cen_pos, cen_neg) + delta)
+    """
+    xp = _get_xp(xp, X, y)
+    X = xp.asarray(X)
+    y = xp.asarray(y)
+
+    pos_idx = xp.where(y == 1)[0]
+    neg_idx = xp.where(y == -1)[0]
+
+    f = xp.ones(X.shape[0], dtype=float)
+    if len(pos_idx) == 0 or len(neg_idx) == 0:
+        return f
+
+    cen_pos = X[pos_idx].mean(axis=0)
+    cen_neg = X[neg_idx].mean(axis=0)
+    d_centers = xp.linalg.norm(cen_pos - cen_neg)
+
+    own_center = xp.where(y[:, None] == 1, cen_pos, cen_neg)
+    opp_center = xp.where(y[:, None] == 1, cen_neg, cen_pos)
+
+    d_own = xp.linalg.norm(X - own_center, axis=1)
+    d_opp = xp.linalg.norm(X - opp_center, axis=1)
+
+    denom = d_own + d_centers + delta
+    return d_opp / denom
+
+
+def soft_margin_violation_from_margin(margin, xp=None):
+    """
+    nu_i = 1 / (1 + exp(B_i)), voi B_i la functional margin.
+    """
+    xp = _get_xp(xp, margin)
+    margin = xp.asarray(margin, dtype=float)
+    margin = xp.clip(margin, -60.0, 60.0)
+    return 1.0 / (1.0 + xp.exp(margin))
+
+
+def fearn_confident(
+    W,
+    y,
+    margin,
+    fuzzy_weight=None,
+    use_fuzzy_spatial_weight=True,
+    xp=None,
+):
+    """
+    FEARN confidence:
+        eps_neg = sum_{i in Negative}(w_i * nu_i)
+        eps_pos = sum_{i in Positive}(w_i * nu_i * f_i)
+        gamma = 2 - (eps_neg + eps_pos)
+        eps_star = eps_neg + gamma * eps_pos
+        alpha_star = 0.5 * ln((1 - eps_star) / eps_star)
+    """
+    xp = _get_xp(xp, W, y, margin)
+    W = xp.asarray(W, dtype=float)
+    y = xp.asarray(y)
+
+    if fuzzy_weight is None:
+        fuzzy_weight = xp.ones_like(W)
+    else:
+        fuzzy_weight = xp.asarray(fuzzy_weight, dtype=float)
+
+    nu = soft_margin_violation_from_margin(margin, xp=xp)
+
+    neg_mask = (y == -1)
+    pos_mask = (y == 1)
+
+    eps_neg = xp.sum(W[neg_mask] * nu[neg_mask])
+    if use_fuzzy_spatial_weight:
+        eps_pos = xp.sum(W[pos_mask] * nu[pos_mask] * fuzzy_weight[pos_mask])
+    else:
+        eps_pos = xp.sum(W[pos_mask] * nu[pos_mask])
+
+    gamma = 2.0 - (eps_neg + eps_pos)
+    eps_star = eps_neg + gamma * eps_pos
+
+    eps_star = _clip_eps(eps_star, xp=xp)
+    alpha_star = 0.5 * xp.log((1.0 - eps_star) / eps_star)
+
+    # Ensure scalar outputs are Python floats for downstream serialization/joblib.
+    return (
+        float(alpha_star),
+        float(eps_star),
+        float(eps_neg),
+        float(eps_pos),
+        float(gamma),
+    )
+
 # =============================================================================
 # def intinitialization_weight_adjustment(N):
 #     '''

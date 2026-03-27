@@ -10,7 +10,7 @@ from collections import Counter
 def load_data(test_size):
 
     df = pd.read_csv(
-        '/home/admin/Workspcae/Thu-Nghiem/data/datasets/Software-Faults/jm1_2000_0.02.csv',
+        'D:/research/Thu-Nghiem/data/datasets/Software-Faults/jm1_2000_0.02.csv',
         na_values=['?']
     )
     y_raw = df['defects'].astype(str).str.strip().str.upper()

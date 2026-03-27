@@ -14,7 +14,7 @@ from data.common.smote_tomek import apply_smote_tomek
 
 def load_data(test_size):
     df = pd.read_csv(
-        '/home/admin/Workspcae/Thu-Nghiem/data/datasets/Software-Faults/jm1_2000_0.02.csv',
+        'D:/research/Thu-Nghiem/data/datasets/Software-Faults/jm1_2000_0.02.csv',
         na_values=['?']
     )
 

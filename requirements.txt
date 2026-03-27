@@ -5,3 +5,5 @@ cvxopt
 keras
 tensorflow
 imbalanced-learn
+joblib
+cupy-cuda12x; platform_system == "Linux"
