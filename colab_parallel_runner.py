@@ -22,12 +22,22 @@ from parallel_experiment_engine import run_tasks_parallel
 
 
 METHOD_REGISTRY = {
-    "SoftMargin_EARN_AdaBoost_SVM": "experiment_methods:run_softmargin_earn_adaboost_svm",
-    "SoftMargin_EARN_AdaBoost_WSVM": "experiment_methods:run_softmargin_earn_adaboost_wsvm",
+    # Traditional Algorithms
+    "Decision Tree": "experiment_methods:run_decision_tree",
+    "SVM (lib)": "experiment_methods:run_svm",
+    "WSVM": "experiment_methods:run_wsvm",
+    "ADA_DSTree": "experiment_methods:run_adaboost_decisiontree",
+    "ADA_SVM": "experiment_methods:run_adaboost_svm",
+    "ADA_WSVM": "experiment_methods:run_adaboost_wsvm",
+
+    # ImADA family
+    "ImADA_12_DecisionTree": "experiment_methods:run_imada_12_decisiontree",
+    "ImADA_12_SVM": "experiment_methods:run_imada_12_svm",
+    "ImADA_12_WSVM": "experiment_methods:run_imada_12_wsvm",
+    
+    # Improved Algorithms
     "FEARN_AdaBoost_SVM": "experiment_methods:run_fearn_adaboost_svm",
     "FEARN_AdaBoost_WSVM": "experiment_methods:run_fearn_adaboost_wsvm",
-    "EANR-AdaBoost_SVM": "experiment_methods:run_eanr_adaboost_svm",
-    "EANR-AdaBoost_WSVM": "experiment_methods:run_eanr_adaboost_wsvm",
 }
 
 
@@ -38,51 +48,83 @@ def build_fearn_tasks(
     y_test,
     M_values,
     C_values,
+    theta_values,
     variant_tag,
     test_size,
+    dataset_name="unknown",
+    fearn_k=9,
+    fearn_lambda_se=1.28,
+    fearn_mu_se=0.4,
     method_switches=None,
 ):
     if method_switches is None:
         method_switches = {
-            "SoftMargin_EARN_AdaBoost_SVM": True,
-            "SoftMargin_EARN_AdaBoost_WSVM": True,
+            "Decision Tree": False,
+            "SVM (lib)": False,
+            "WSVM": False,
+            "ADA_DSTree": False,
+            "ADA_SVM": False,
+            "ADA_WSVM": False,
+            "ImADA_12_DecisionTree": False,
+            "ImADA_12_SVM": False,
+            "ImADA_12_WSVM": False,
             "FEARN_AdaBoost_SVM": True,
-            "FEARN_AdaBoost_WSVM": True,
-            "EANR-AdaBoost_SVM": False,
-            "EANR-AdaBoost_WSVM": False,
+            "FEARN_AdaBoost_WSVM": False,
         }
 
     tasks = []
-    for m in M_values:
-        for c in C_values:
-            for method_name, enabled in method_switches.items():
-                if not enabled:
-                    continue
-                if method_name not in METHOD_REGISTRY:
-                    continue
+    active_methods = [m for m, enabled in method_switches.items() if enabled and m in METHOD_REGISTRY]
+    print(f"Active methods: {active_methods}")
 
-                tasks.append(
-                    {
-                        "method_path": METHOD_REGISTRY[method_name],
-                        "method_kwargs": {
-                            "M": m,
-                            "C": c,
-                            "X_train": X_train,
-                            "y_train": y_train,
-                            "X_test": X_test,
-                        },
-                        "metadata": {
-                            "method": method_name,
-                            "M": m,
-                            "C": c,
-                            "theta": "None",
-                            "variant": variant_tag,
-                            "test_size": test_size,
-                            "y_test": y_test,
-                        },
-                        "cleanup_gpu": True,
+    for method_name, enabled in method_switches.items():
+        if not enabled:
+            continue
+        if method_name not in METHOD_REGISTRY:
+            continue
+
+        needs_m = "ADA" in method_name or "AdaBoost" in method_name
+        needs_c = "SVM" in method_name or "WSVM" in method_name or "FEARN" in method_name
+        
+        m_list = M_values if needs_m else [None]
+        c_list = C_values if needs_c else [None]
+
+        needs_theta = method_name.startswith("ImADA_12")
+        theta_list = theta_values if needs_theta else [None]
+
+        for m in m_list:
+            for c in c_list:
+                for th in theta_list:
+                    method_kwargs = {
+                        "M": m,
+                        "C": c,
+                        "X_train": X_train,
+                        "y_train": y_train,
+                        "X_test": X_test,
                     }
-                )
+                    if needs_theta:
+                        method_kwargs["theta"] = th
+                    if method_name.startswith("FEARN_AdaBoost"):
+                        method_kwargs["K"] = fearn_k
+                        method_kwargs["lambda_se"] = fearn_lambda_se
+                        method_kwargs["mu_se"] = fearn_mu_se
+
+                    tasks.append(
+                        {
+                            "method_path": METHOD_REGISTRY[method_name],
+                            "method_kwargs": method_kwargs,
+                            "metadata": {
+                                "dataset": dataset_name,
+                                "method": method_name,
+                                "M": m if m is not None else "N/A",
+                                "C": c if c is not None else "N/A",
+                                "theta": th if th is not None else "None",
+                                "variant": variant_tag,
+                                "test_size": test_size,
+                                "y_test": y_test,
+                            },
+                            "cleanup_gpu": True,
+                        }
+                    )
     return tasks
 
 
@@ -119,6 +161,7 @@ def save_raw_parallel_results(results, output_csv_path):
                 )
                 writer.writerow(
                     [
+                        md.get("dataset", "unknown"),
                         md["test_size"],
                         f"{md['method']} | {md['variant']}",
                         md["M"],
@@ -139,6 +182,7 @@ def save_raw_parallel_results(results, output_csv_path):
             else:
                 writer.writerow(
                     [
+                        md.get("dataset", "unknown"),
                         md.get("test_size"),
                         f"{md.get('method')} | {md.get('variant')}",
                         md.get("M"),
@@ -160,6 +204,7 @@ def save_raw_parallel_results(results, output_csv_path):
 
 def init_raw_parallel_results_file(output_csv_path):
     header = [
+        "Dataset",
         "Test Size",
         "Method",
         "M",
@@ -186,10 +231,15 @@ def run_parallel_scenario(
     y_train,
     X_test,
     y_test,
+    dataset_name="unknown",
     variant_tag="ORIG",
     test_size=0.2,
     M_values=None,
     C_values=None,
+    theta_values=None,
+    fearn_k=9,
+    fearn_lambda_se=1.28,
+    fearn_mu_se=0.4,
     method_switches=None,
     n_jobs=-1,
     batch_size=4,
@@ -198,6 +248,8 @@ def run_parallel_scenario(
         M_values = [10, 15, 20, 25]
     if C_values is None:
         C_values = [10, 100, 1000]
+    if theta_values is None:
+        theta_values = [1.0]
 
     tasks = build_fearn_tasks(
         X_train,
@@ -206,6 +258,11 @@ def run_parallel_scenario(
         y_test,
         M_values=M_values,
         C_values=C_values,
+        theta_values=theta_values,
+        dataset_name=dataset_name,
+        fearn_k=fearn_k,
+        fearn_lambda_se=fearn_lambda_se,
+        fearn_mu_se=fearn_mu_se,
         variant_tag=variant_tag,
         test_size=test_size,
         method_switches=method_switches,
@@ -215,7 +272,8 @@ def run_parallel_scenario(
     ts = datetime.now().strftime("%d%m%Y_%H%M%S")
     out_dir = "./Experiment"
     os.makedirs(out_dir, exist_ok=True)
-    out = f"{out_dir}/ParallelRaw_{variant_tag}_{ts}.csv"
+    safe_dataset = str(dataset_name).replace(" ", "_")
+    out = f"{out_dir}/ParallelRaw_{safe_dataset}_{variant_tag}_{ts}.csv"
     init_raw_parallel_results_file(out)
 
     print(f"Planned tasks: {len(tasks)}")

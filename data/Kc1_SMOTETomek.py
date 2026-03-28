@@ -15,7 +15,7 @@ from data.common.smote_tomek import apply_smote_tomek
 
 def load_data(test_size, new_rate=0.2):
     df = pd.read_csv(
-        'D:/research/Thu-Nghiem/data/datasets/Software-Faults/jm1_500_0.25.csv',
+        'D:/research/Thu-Nghiem/data/datasets/Software-Faults/kc1.csv',
         na_values=['?']
     )
 
@@ -42,4 +42,4 @@ def load_data(test_size, new_rate=0.2):
 
     X_train, y_train = apply_smote_tomek(X_train, y_train)
 
-    return X_train, y_train.to_numpy(), X_test, y_test.to_numpy()
+    return X_train, np.asarray(y_train), X_test, np.asarray(y_test)

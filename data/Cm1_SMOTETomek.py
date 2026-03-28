@@ -42,4 +42,4 @@ def load_data(test_size, new_rate=0.2):
 
     X_train, y_train = apply_smote_tomek(X_train, y_train)
 
-    return X_train, y_train.to_numpy(), X_test, y_test.to_numpy()
+    return X_train, np.asarray(y_train), X_test, np.asarray(y_test)

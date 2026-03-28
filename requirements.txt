@@ -6,4 +6,4 @@ keras
 tensorflow
 imbalanced-learn
 joblib
-cupy-cuda12x; platform_system == "Linux"
+cupy-cuda13x; platform_system == "Linux"
