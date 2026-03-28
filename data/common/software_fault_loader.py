@@ -7,6 +7,7 @@ from pandas.errors import ParserError
 from sklearn.model_selection import train_test_split as tts
 from sklearn.preprocessing import StandardScaler
 
+from data.common.change_rate_data import change_rate_data
 from data.common.smote_tomek import apply_smote_tomek
 
 
@@ -103,9 +104,17 @@ def _extract_xy(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]:
     return X, y.to_numpy()
 
 
-def load_software_fault_data(path: str, test_size: float, use_smote_tomek: bool = False):
+def load_software_fault_data(
+    path: str,
+    test_size: float,
+    use_smote_tomek: bool = False,
+    new_rate: float | None = None,
+):
     df = _read_software_fault_dataframe(path)
     X, y = _extract_xy(df)
+
+    if new_rate is not None:
+        X, y = change_rate_data(X, y, new_rate=new_rate)
 
     X_train, X_test, y_train, y_test = tts(
         X,

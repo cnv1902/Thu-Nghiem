@@ -1,10 +1,6 @@
 import numpy as np
 import fearn_adaboost as fearn_toa
-<<<<<<< HEAD
 import old.trainning_of_adaboost as toa
-=======
-import trainning_of_adaboost as toa
->>>>>>> 4b2c6f45b842ca9db5de83c98e458273c037a538
 import ImAda_DecisionTree
 
 from sklearn.tree import DecisionTreeClassifier

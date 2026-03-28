@@ -118,7 +118,6 @@ def fit(
     return w, b, alpha
             
 
-<<<<<<< HEAD
 def predict(X,  w, b, alpha, M =10):
     loops = min(M, len(alpha), len(w), len(b))
     if loops <= 0:
@@ -131,13 +130,4 @@ def predict(X,  w, b, alpha, M =10):
     margins = X.dot(w_stack.T) + b_vec
     weak_votes = np.sign(margins)
     H = weak_votes.dot(alpha_vec)
-=======
-def predict(X,  w, b, alpha, M =10, use_gpu=False, cleanup_gpu=False):
-    H = np.zeros(X.shape[0])
-    for i in range (M):
-        h_i = np.sign(X.dot(w[i]) + b[i])
-        H += alpha[i] * h_i
-    if cleanup_gpu:
-        cleanup_gpu_memory()
->>>>>>> 4b2c6f45b842ca9db5de83c98e458273c037a538
     return np.sign(H)
