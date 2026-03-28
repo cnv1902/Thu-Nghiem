@@ -1,6 +1,7 @@
 import numpy as np
 
 
+<<<<<<< HEAD
 def _clip_eps(eps, lower=1e-12, upper=1 - 1e-12):
     return np.clip(eps, lower, upper)
 
@@ -44,6 +45,124 @@ def soft_margin_violation_from_margin(margin):
 
 
 def fearn_confident(W, y, margin, fuzzy_weight=None, use_fuzzy_spatial_weight=True):
+=======
+def _get_xp(xp=None, *arrays):
+    if xp is not None:
+        return xp
+    try:
+        import cupy as cp
+        if arrays:
+            return cp.get_array_module(*arrays)
+    except Exception:
+        pass
+    return np
+
+
+def _clip_eps(eps, lower=1e-12, upper=1 - 1e-12, xp=None):
+    xp = _get_xp(xp, eps)
+    return xp.clip(eps, lower, upper)
+
+
+def compute_fuzzy_spatial_weight(X, y, delta=1e-6, xp=None, k=9, chunk_size=None):
+    """
+    KNN-based fuzzy weight (Đã sửa lỗi "Too Safe Paradox"):
+    Tìm độc lập K láng giềng Dương và K láng giềng Âm để tính D_pos, D_neg.
+    """
+    xp = _get_xp(xp, X, y)
+    X = xp.asarray(X, dtype=float)
+    y = xp.asarray(y)
+
+    n = X.shape[0]
+    f = xp.ones(n, dtype=float)
+
+    pos_idx = xp.where(y == 1)[0]
+    neg_idx = xp.where(y == -1)[0]
+
+    if len(pos_idx) == 0 or len(neg_idx) == 0 or n <= 1:
+        return f
+
+    # Số lượng láng giềng tối đa có thể lấy cho mỗi lớp
+    k_pos_eff = int(min(k, len(pos_idx) - 1)) # -1 vì phải bỏ chính nó
+    k_neg_eff = int(min(k, len(neg_idx)))
+
+    if k_pos_eff <= 0 or k_neg_eff <= 0:
+        return f
+
+    if chunk_size is None:
+        chunk_size = 512 if getattr(xp, "__name__", "") == "cupy" else len(pos_idx)
+
+    x_norm2 = xp.sum(X * X, axis=1)
+
+    for start in range(0, len(pos_idx), chunk_size):
+        end = min(start + chunk_size, len(pos_idx))
+        idx_chunk = pos_idx[start:end]
+        Q = X[idx_chunk]
+
+        q_norm2 = xp.sum(Q * Q, axis=1)
+        # Tính khoảng cách từ Query (Dương) tới TOÀN BỘ dữ liệu X
+        dist2 = q_norm2[:, None] + x_norm2[None, :] - 2.0 * (Q @ X.T)
+        dist2 = xp.maximum(dist2, 0.0)
+
+        # Loại trừ chính mẫu query (để không tự nhận nó là láng giềng)
+        row_idx = xp.arange(dist2.shape[0])
+        dist2[row_idx, idx_chunk] = xp.inf
+
+        # ---------------------------------------------------------
+        # ĐỘT PHÁ TOÁN HỌC: TÁCH KHÔNG GIAN ĐỂ TRÁNH NGHỊCH LÝ
+        # ---------------------------------------------------------
+        # 1. Cắt ma trận khoảng cách chỉ lấy vùng nhãn DƯƠNG
+        dist2_pos = dist2[:, pos_idx]
+        knn_idx_pos = xp.argpartition(dist2_pos, kth=k_pos_eff - 1, axis=1)[:, :k_pos_eff]
+        knn_dist_pos = xp.sqrt(xp.take_along_axis(dist2_pos, knn_idx_pos, axis=1))
+        d_pos = xp.sum(knn_dist_pos, axis=1)
+
+        # 2. Cắt ma trận khoảng cách chỉ lấy vùng nhãn ÂM
+        dist2_neg = dist2[:, neg_idx]
+        knn_idx_neg = xp.argpartition(dist2_neg, kth=k_neg_eff - 1, axis=1)[:, :k_neg_eff]
+        knn_dist_neg = xp.sqrt(xp.take_along_axis(dist2_neg, knn_idx_neg, axis=1))
+        d_neg = xp.sum(knn_dist_neg, axis=1)
+
+        # 3. Tính Fuzzy Weight
+        f[idx_chunk] = d_neg / (d_pos + d_neg + delta)
+
+    return f
+
+
+def calculate_fuzzy_weight_cen_2c(X, y, K=7, delta=1e-6, xp=None, chunk_size=None):
+    """
+    Backward-compatible API cho tien xu ly fuzzy weight.
+    """
+    return compute_fuzzy_spatial_weight(
+        X,
+        y,
+        delta=delta,
+        xp=xp,
+        k=K,
+        chunk_size=chunk_size,
+    )
+
+
+def soft_margin_violation_from_margin(margin, xp=None, clip_bound=50.0):
+    """
+    nu_i = 1 / (1 + exp(B_i)), voi B_i la functional margin.
+    """
+    xp = _get_xp(xp, margin)
+    margin = xp.asarray(margin, dtype=float)
+    margin = xp.clip(margin, -clip_bound, clip_bound)
+    return 1.0 / (1.0 + xp.exp(margin))
+
+
+def fearn_confident(
+    W,
+    y,
+    margin,
+    fuzzy_weight=None,
+    use_fuzzy_spatial_weight=True,
+    mu_se=0.4,
+    clip_bound=50.0,
+    xp=None,
+):
+>>>>>>> 4b2c6f45b842ca9db5de83c98e458273c037a538
     """
     FEARN confidence:
         eps_neg = sum_{i in Negative}(w_i * nu_i)
@@ -52,6 +171,7 @@ def fearn_confident(W, y, margin, fuzzy_weight=None, use_fuzzy_spatial_weight=Tr
         eps_star = eps_neg + gamma * eps_pos
         alpha_star = 0.5 * ln((1 - eps_star) / eps_star)
     """
+<<<<<<< HEAD
     W = np.asarray(W, dtype=float)
     y = np.asarray(y)
 
@@ -61,22 +181,58 @@ def fearn_confident(W, y, margin, fuzzy_weight=None, use_fuzzy_spatial_weight=Tr
         fuzzy_weight = np.asarray(fuzzy_weight, dtype=float)
 
     nu = soft_margin_violation_from_margin(margin)
+=======
+    xp = _get_xp(xp, W, y, margin)
+    W = xp.asarray(W, dtype=float)
+    y = xp.asarray(y)
+
+    if fuzzy_weight is None:
+        fuzzy_weight = xp.ones_like(W)
+    else:
+        fuzzy_weight = xp.asarray(fuzzy_weight, dtype=float)
+
+    functional_margin = y * margin
+    nu = soft_margin_violation_from_margin(functional_margin, xp=xp, clip_bound=clip_bound)
+>>>>>>> 4b2c6f45b842ca9db5de83c98e458273c037a538
 
     neg_mask = (y == -1)
     pos_mask = (y == 1)
 
+<<<<<<< HEAD
     eps_neg = np.sum(W[neg_mask] * nu[neg_mask])
     if use_fuzzy_spatial_weight:
         eps_pos = np.sum(W[pos_mask] * nu[pos_mask] * fuzzy_weight[pos_mask])
     else:
         eps_pos = np.sum(W[pos_mask] * nu[pos_mask])
+=======
+    eps_neg = xp.sum(W[neg_mask] * nu[neg_mask])
+    if use_fuzzy_spatial_weight:
+        f_adjusted = xp.clip(fuzzy_weight[pos_mask], mu_se, 1.0)
+        eps_pos = xp.sum(W[pos_mask] * nu[pos_mask] * f_adjusted)
+    else:
+        eps_pos = xp.sum(W[pos_mask] * nu[pos_mask])
+>>>>>>> 4b2c6f45b842ca9db5de83c98e458273c037a538
 
     gamma = 2.0 - (eps_neg + eps_pos)
     eps_star = eps_neg + gamma * eps_pos
 
+<<<<<<< HEAD
     eps_star = _clip_eps(eps_star)
     alpha_star = 0.5 * np.log((1.0 - eps_star) / eps_star)
     return alpha_star, eps_star, eps_neg, eps_pos, gamma
+=======
+    eps_star = xp.clip(eps_star, 1e-12, 0.499)
+    alpha_star = 0.5 * xp.log((1.0 - eps_star) / eps_star)
+
+    # Ensure scalar outputs are Python floats for downstream serialization/joblib.
+    return (
+        float(alpha_star),
+        float(eps_star),
+        float(eps_neg),
+        float(eps_pos),
+        float(gamma),
+    )
+>>>>>>> 4b2c6f45b842ca9db5de83c98e458273c037a538
 
 # =============================================================================
 # def intinitialization_weight_adjustment(N):

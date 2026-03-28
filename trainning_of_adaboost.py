@@ -1,6 +1,7 @@
 import numpy as np
 import methods
 import svm
+from gpu_backend import cleanup_gpu_memory
 
 
 def fit(
@@ -15,6 +16,8 @@ def fit(
     theta=1,
     use_entropy_init=False,
     use_noise_robust_confident=False,
+    use_gpu=False,
+    cleanup_gpu=False,
 ):
     '''
     Input:
@@ -73,6 +76,9 @@ def fit(
             # Update weight adjustment and instance categorization
             W_ada = methods.update_weight_adjustment(W_ada, alpha_i,true_index, false_index)
             B_ada = methods.update_instance_categorization_final(X, y, wi, bi)
+
+            if cleanup_gpu:
+                cleanup_gpu_memory()
             
     else:
         for i in range(M):
@@ -105,10 +111,14 @@ def fit(
             
             # Update weight adjustment
             W_ada = methods.update_weight_adjustment(W_ada, alpha_i,true_index,false_index)
+
+            if cleanup_gpu:
+                cleanup_gpu_memory()
             
     return w, b, alpha
             
 
+<<<<<<< HEAD
 def predict(X,  w, b, alpha, M =10):
     loops = min(M, len(alpha), len(w), len(b))
     if loops <= 0:
@@ -121,4 +131,13 @@ def predict(X,  w, b, alpha, M =10):
     margins = X.dot(w_stack.T) + b_vec
     weak_votes = np.sign(margins)
     H = weak_votes.dot(alpha_vec)
+=======
+def predict(X,  w, b, alpha, M =10, use_gpu=False, cleanup_gpu=False):
+    H = np.zeros(X.shape[0])
+    for i in range (M):
+        h_i = np.sign(X.dot(w[i]) + b[i])
+        H += alpha[i] * h_i
+    if cleanup_gpu:
+        cleanup_gpu_memory()
+>>>>>>> 4b2c6f45b842ca9db5de83c98e458273c037a538
     return np.sign(H)

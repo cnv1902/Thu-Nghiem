@@ -1,0 +1,9 @@
+Dataset,Test Size,Method,M,C,theta,SP,SE,Gmean,F1 Score,Precision,Accuracy,AUC,Ma tran nham lan,List of err_w,List of alpha
+pc2,0.2,Decision Tree | ORIG,N/A,N/A,None,0.9973045822102425,0.0,0.0,0.0,0.0,0.9928443649373881,0.49865229110512127,"[[1110    3]
+ [   5    0]]",None,None
+pc2,0.2,SVM (lib) | ORIG,N/A,10,None,1.0,0.0,0.0,0.0,0.0,0.9955277280858676,0.5,"[[1113    0]
+ [   5    0]]",None,None
+pc2,0.2,SVM (lib) | ORIG,N/A,100,None,1.0,0.0,0.0,0.0,0.0,0.9955277280858676,0.5,"[[1113    0]
+ [   5    0]]",None,None
+pc2,0.2,WSVM | ORIG,N/A,10,None,1.0,0.0,0.0,0.0,0.0,0.9955277280858676,0.5,"[[1113    0]
+ [   5    0]]",None,None
