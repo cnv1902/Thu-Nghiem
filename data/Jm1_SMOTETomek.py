@@ -7,14 +7,16 @@ trước khi trả về, nhằm cân bằng lớp (Tổ hợp B / C trong kich_b
 
 import numpy as np
 import pandas as pd
+from pathlib import Path
 from sklearn.model_selection import train_test_split as tts
 from sklearn.preprocessing import StandardScaler
 from data.common.smote_tomek import apply_smote_tomek
 
 
 def load_data(test_size):
+    dataset_path = Path(__file__).resolve().parent / "datasets" / "Software-Faults" / "jm1_2000_0.02.csv"
     df = pd.read_csv(
-        '/home/admin/Workspcae/Thu-Nghiem/data/datasets/Software-Faults/jm1_2000_0.02.csv',
+        dataset_path,
         na_values=['?']
     )
 
@@ -42,4 +44,4 @@ def load_data(test_size):
     # CT 2.3: Chỉ áp dụng SMOTETomek trên tập train
     X_train, y_train = apply_smote_tomek(X_train, y_train)
 
-    return X_train, y_train.to_numpy(), X_test, y_test.to_numpy()
+    return X_train, np.asarray(y_train), X_test, np.asarray(y_test)

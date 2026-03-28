@@ -1,13 +1,15 @@
 import numpy as np
 import pandas as pd
+from pathlib import Path
 from sklearn.model_selection import train_test_split as tts
 from sklearn.preprocessing import StandardScaler
 from data.common.change_rate_data import change_rate_data
 
 
 def load_data(test_size, new_rate=0.2):
+    dataset_path = Path(__file__).resolve().parent / "datasets" / "Software-Faults" / "cm1.csv"
     df = pd.read_csv(
-        'D:/research/Thu-Nghiem/data/datasets/Software-Faults/cm1.csv',
+        dataset_path,
         na_values=['?']
     )
 

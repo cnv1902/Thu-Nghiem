@@ -74,13 +74,13 @@ def fit(
 #     return np.sign(H)
 
 def predict(X, alpha, clfs):
-    y_pred = np.zeros(len(X))
-    for alpha, clf in zip(alpha, clfs):
-        y_pred_weak = clf.predict(X)
-        # quantize y_pred_weak to {0, 1}
-        y_pred_weak = np.where(y_pred_weak == 1, 1, -1)
-        y_pred += alpha * y_pred_weak
+    loops = min(len(alpha), len(clfs))
+    if loops <= 0:
+        return np.where(np.zeros(len(X)) > 0, 1, -1)
 
-    # quantize y_pred to {-1, 1}
-    y_pred = np.where(y_pred > 0, 1, -1)
-    return y_pred
+    alpha_vec = np.asarray(alpha[:loops])
+    weak_preds = np.asarray([clfs[i].predict(X) for i in range(loops)])
+    weak_preds = np.where(weak_preds == 1, 1, -1)
+
+    y_score = np.dot(alpha_vec, weak_preds)
+    return np.where(y_score > 0, 1, -1)

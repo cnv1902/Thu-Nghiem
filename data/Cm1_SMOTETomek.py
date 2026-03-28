@@ -7,6 +7,7 @@ trước khi trả về, nhằm cân bằng lớp.
 
 import numpy as np
 import pandas as pd
+from pathlib import Path
 from sklearn.model_selection import train_test_split as tts
 from sklearn.preprocessing import StandardScaler
 from data.common.change_rate_data import change_rate_data
@@ -14,8 +15,9 @@ from data.common.smote_tomek import apply_smote_tomek
 
 
 def load_data(test_size, new_rate=0.2):
+    dataset_path = Path(__file__).resolve().parent / "datasets" / "Software-Faults" / "cm1.csv"
     df = pd.read_csv(
-        'D:/research/Thu-Nghiem/data/datasets/Software-Faults/cm1.csv',
+        dataset_path,
         na_values=['?']
     )
 
@@ -42,4 +44,4 @@ def load_data(test_size, new_rate=0.2):
 
     X_train, y_train = apply_smote_tomek(X_train, y_train)
 
-    return X_train, y_train.to_numpy(), X_test, y_test.to_numpy()
+    return X_train, np.asarray(y_train), X_test, np.asarray(y_test)

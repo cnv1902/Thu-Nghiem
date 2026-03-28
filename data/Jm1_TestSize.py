@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import pandas as pd
+from pathlib import Path
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 from sklearn.model_selection import train_test_split as tts
 from sklearn.preprocessing import StandardScaler
@@ -8,9 +9,10 @@ from sklearn.decomposition import PCA
 from collections import Counter
 
 def load_data(test_size):
+    dataset_path = Path(__file__).resolve().parent / "datasets" / "Software-Faults" / "jm1_2000_0.02.csv"
 
     df = pd.read_csv(
-        '/home/admin/Workspcae/Thu-Nghiem/data/datasets/Software-Faults/jm1_2000_0.02.csv',
+        dataset_path,
         na_values=['?']
     )
     y_raw = df['defects'].astype(str).str.strip().str.upper()

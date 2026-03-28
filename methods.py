@@ -1,4 +1,83 @@
 import numpy as np
+
+
+def _clip_eps(eps, lower=1e-12, upper=1 - 1e-12):
+    return np.clip(eps, lower, upper)
+
+
+def compute_fuzzy_spatial_weight(X, y, delta=1e-6):
+    """
+    Fuzzy spatial weight theo cong thuc:
+    f_i = d(x_i, cen_opp) / (d(x_i, cen_own) + d(cen_pos, cen_neg) + delta)
+    """
+    X = np.asarray(X)
+    y = np.asarray(y)
+
+    pos_idx = np.where(y == 1)[0]
+    neg_idx = np.where(y == -1)[0]
+
+    f = np.ones(X.shape[0], dtype=float)
+    if len(pos_idx) == 0 or len(neg_idx) == 0:
+        return f
+
+    cen_pos = X[pos_idx].mean(axis=0)
+    cen_neg = X[neg_idx].mean(axis=0)
+    d_centers = np.linalg.norm(cen_pos - cen_neg)
+
+    own_center = np.where(y[:, None] == 1, cen_pos, cen_neg)
+    opp_center = np.where(y[:, None] == 1, cen_neg, cen_pos)
+
+    d_own = np.linalg.norm(X - own_center, axis=1)
+    d_opp = np.linalg.norm(X - opp_center, axis=1)
+
+    denom = d_own + d_centers + delta
+    return d_opp / denom
+
+
+def soft_margin_violation_from_margin(margin):
+    """
+    nu_i = 1 / (1 + exp(B_i)), voi B_i la functional margin.
+    """
+    margin = np.asarray(margin, dtype=float)
+    margin = np.clip(margin, -60.0, 60.0)
+    return 1.0 / (1.0 + np.exp(margin))
+
+
+def fearn_confident(W, y, margin, fuzzy_weight=None, use_fuzzy_spatial_weight=True):
+    """
+    FEARN confidence:
+        eps_neg = sum_{i in Negative}(w_i * nu_i)
+        eps_pos = sum_{i in Positive}(w_i * nu_i * f_i)
+        gamma = 2 - (eps_neg + eps_pos)
+        eps_star = eps_neg + gamma * eps_pos
+        alpha_star = 0.5 * ln((1 - eps_star) / eps_star)
+    """
+    W = np.asarray(W, dtype=float)
+    y = np.asarray(y)
+
+    if fuzzy_weight is None:
+        fuzzy_weight = np.ones_like(W)
+    else:
+        fuzzy_weight = np.asarray(fuzzy_weight, dtype=float)
+
+    nu = soft_margin_violation_from_margin(margin)
+
+    neg_mask = (y == -1)
+    pos_mask = (y == 1)
+
+    eps_neg = np.sum(W[neg_mask] * nu[neg_mask])
+    if use_fuzzy_spatial_weight:
+        eps_pos = np.sum(W[pos_mask] * nu[pos_mask] * fuzzy_weight[pos_mask])
+    else:
+        eps_pos = np.sum(W[pos_mask] * nu[pos_mask])
+
+    gamma = 2.0 - (eps_neg + eps_pos)
+    eps_star = eps_neg + gamma * eps_pos
+
+    eps_star = _clip_eps(eps_star)
+    alpha_star = 0.5 * np.log((1.0 - eps_star) / eps_star)
+    return alpha_star, eps_star, eps_neg, eps_pos, gamma
+
 # =============================================================================
 # def intinitialization_weight_adjustment(N):
 #     '''
@@ -199,40 +278,28 @@ def noise_robust_confident(X, y, W, false_index_P, false_index_N, proposed_alpha
     '''
     if proposed_alpha is True:
         esp_N = np.sum(W[false_index_N])
-        
-        esp_P_safe = 0
-        esp_P_noisy = 0
-        
-        # Tiền xử lý: Phân loại nhiễu bằng KNN cho các mẫu dương bị sai
+
+        esp_P_safe = 0.0
+        esp_P_noisy = 0.0
+
+        # Phân loại safe/noisy theo KNN bằng thao tác vectorized trên toàn bộ false_index_P.
         if len(false_index_P) > 0:
-            # Dùng NearestNeighbors thay vì KNeighborsClassifier để chạy nhanh hơn
-            # k=K+1 vì láng giềng gần nhất luôn là chính nó (khoảng cách = 0)
-            nn = NearestNeighbors(n_neighbors=K+1)
+            nn = NearestNeighbors(n_neighbors=K + 1)
             nn.fit(X)
-            
-            # Chỉ lấy các điểm dương dự đoán sai ra để đối chiếu
-            distances, indices = nn.kneighbors(X[false_index_P])
-            
-            safe_P_indices = []
-            noisy_P_indices = []
-            
-            for i, idx in enumerate(false_index_P):
-                # Bỏ qua index đầu tiên vì đó là chính nó
-                neighbor_indices = indices[i][1:]
-                neighbor_labels = y[neighbor_indices]
-                
-                # Đếm số lượng láng giềng mang nhãn ÂM (-1)
-                negative_count = np.sum(neighbor_labels == -1)
-                
-                # Nếu quá nửa láng giềng là Âm -> Điểm này bị nhiễu (Lọt thỏm trong vùng âm)
-                if negative_count > (K / 2):
-                    noisy_P_indices.append(idx)
-                else:
-                    safe_P_indices.append(idx)
-            
-            # Tính tổng trọng số lỗi cho 2 nhóm riêng biệt
-            esp_P_safe = np.sum(W[safe_P_indices]) if len(safe_P_indices) > 0 else 0
-            esp_P_noisy = np.sum(W[noisy_P_indices]) if len(noisy_P_indices) > 0 else 0
+            _, indices = nn.kneighbors(X[false_index_P])
+
+            neighbor_labels = y[indices[:, 1:]]
+            negative_count = np.sum(neighbor_labels == -1, axis=1)
+            noisy_mask = negative_count > (K / 2)
+
+            false_index_P_arr = np.asarray(false_index_P)
+            safe_P_indices = false_index_P_arr[~noisy_mask]
+            noisy_P_indices = false_index_P_arr[noisy_mask]
+
+            if safe_P_indices.size > 0:
+                esp_P_safe = np.sum(W[safe_P_indices])
+            if noisy_P_indices.size > 0:
+                esp_P_noisy = np.sum(W[noisy_P_indices])
 
         # Tổng lỗi thực tế
         E_total = esp_N + esp_P_safe + esp_P_noisy
@@ -284,45 +351,47 @@ def update_weights(weights, y_pred, y, alpha):
 def update_instance_categorization_final(X, y, w, b):
     # Obtain categorization_weight
     C = np.ones(X.shape[0])
-    B = (X.dot(w) + b)
-    A = 1 - y * (X.dot(w) + b)
-    # BSV_weight
-    num_of_BSV = np.where((-1 < B) & (B < 1))[0].shape[0]
-    # print(num_of_BSV)
-    pos_BSV = np.where((0 < B) & (B < 1))[0]
-    num_of_pos_BSV = pos_BSV.shape[0]
-    # print(num_of_pos_BSV)
-    neg_BSV = np.where((-1 < B) & (B < 0))[0]
-    num_of_neg_BSV = neg_BSV.shape[0]
-    # print(num_of_neg_BSV)
-    nhan_duong_BSV = np.where((-1 < B) & (B < 1) & (y == 1))[0]
-    nhan_am_BSV = np.where((-1 < B) & (B < 1) & (y == -1))[0]
-    if (num_of_pos_BSV != 0):
-        C[nhan_duong_BSV] = num_of_BSV / (2 * (num_of_pos_BSV))
-    if (num_of_neg_BSV != 0):
-        C[nhan_am_BSV] = num_of_BSV / (2 * (num_of_neg_BSV))
-    # SV weight
-    num_of_SV = np.where((B == -1) | (B == 1))[0].shape[0]
-    if (num_of_SV != 0):
-        pos_SV = np.where((B == 1))[0]
-        num_of_pos_SV = pos_SV.shape[0]
-        nhan_duong_SV = np.where(((B == -1) | (B == 1)) & (y == 1))[0]
-        nhan_am_SV = np.where(((B == -1) | (B == 1)) & (y == -1))[0]
-        if (num_of_pos_SV != 0):
-            C[nhan_duong_SV] = num_of_SV / (2 * num_of_pos_SV)
-        neg_SV = np.where((B == -1))[0]
-        num_of_neg_SV = neg_SV.shape[0]
-        if (num_of_neg_SV != 0):
-            C[nhan_am_SV] = num_of_SV / (2 * num_of_neg_SV)
+    B = X.dot(w) + b
+
+    bsv_mask = (-1 < B) & (B < 1)
+    pos_bsv_mask = (0 < B) & (B < 1)
+    neg_bsv_mask = (-1 < B) & (B < 0)
+    bsv_pos_label_mask = bsv_mask & (y == 1)
+    bsv_neg_label_mask = bsv_mask & (y == -1)
+
+    num_of_BSV = np.count_nonzero(bsv_mask)
+    num_of_pos_BSV = np.count_nonzero(pos_bsv_mask)
+    num_of_neg_BSV = np.count_nonzero(neg_bsv_mask)
+
+    if num_of_pos_BSV != 0:
+        C[bsv_pos_label_mask] = num_of_BSV / (2 * num_of_pos_BSV)
+    if num_of_neg_BSV != 0:
+        C[bsv_neg_label_mask] = num_of_BSV / (2 * num_of_neg_BSV)
+
+    sv_mask = (B == -1) | (B == 1)
+    num_of_SV = np.count_nonzero(sv_mask)
+    if num_of_SV != 0:
+        pos_sv_mask = (B == 1)
+        neg_sv_mask = (B == -1)
+        sv_pos_label_mask = sv_mask & (y == 1)
+        sv_neg_label_mask = sv_mask & (y == -1)
+
+        num_of_pos_SV = np.count_nonzero(pos_sv_mask)
+        num_of_neg_SV = np.count_nonzero(neg_sv_mask)
+
+        if num_of_pos_SV != 0:
+            C[sv_pos_label_mask] = num_of_SV / (2 * num_of_pos_SV)
+        if num_of_neg_SV != 0:
+            C[sv_neg_label_mask] = num_of_SV / (2 * num_of_neg_SV)
     # positive noise
     # positive_noise = np.where(((A <= 2) & (y == 1)))[0]
     # positive_noise = np.where(((A > 2) & (y == -1)))[0]
-    positive_noise = np.where(((B > 1) & (y == -1)))[0]
-    num_of_positive_noise = positive_noise.shape[0]
+    positive_noise_mask = (B > 1) & (y == -1)
+    num_of_positive_noise = np.count_nonzero(positive_noise_mask)
     # num_of_positive = np.where(y == 1)[0].shape[0]
-    num_of_positive = np.where(B > 0)[0].shape[0]
-    if (num_of_positive != 0):
-        C[positive_noise] = np.exp(num_of_positive_noise / num_of_positive)
+    num_of_positive = np.count_nonzero(B > 0)
+    if num_of_positive != 0:
+        C[positive_noise_mask] = np.exp(num_of_positive_noise / num_of_positive)
 
     return C
 
@@ -330,33 +399,37 @@ def update_instance_categorization_final(X, y, w, b):
 def update_instance_categorization(X, y, w, b):
     # Obtain categorization_weight
     C = np.ones(X.shape[0])
-    A = 1 - y * (X.dot(w)+b)
-    # BSV_weight
-    num_of_BSV = np.where((A> 0)&(A<2))[0].shape[0]
-    pos_BSV = np.where((A> 0)&(A<2)&(y == 1))[0]
-    num_of_pos_BSV = pos_BSV.shape[0]
-    neg_BSV = np.where((A> 0)&(A<2)&(y == -1))[0]
-    num_of_neg_BSV = neg_BSV.shape[0]
-    if (num_of_pos_BSV != 0):
-        C[pos_BSV] = num_of_BSV / (2 *(num_of_pos_BSV))
-    if (num_of_neg_BSV != 0):
-        C[neg_BSV] = num_of_BSV / (2 *(num_of_neg_BSV))
-    #SV weight
-    num_of_SV = np.where(A == 0)[0].shape[0]
-    if (num_of_SV != 0):
-        pos_SV = np.where((A== 0)&(y == 1))[0]
-        num_of_pos_SV = pos_SV.shape[0]
-        if (num_of_pos_SV != 0):
-            C[pos_SV] = num_of_SV / (2 * num_of_pos_SV)
-        neg_SV = np.where((A== 0)&(y == -1))[0]
-        num_of_neg_SV = neg_SV.shape[0]
-        if (num_of_neg_SV != 0):
-            C[neg_SV] = num_of_SV / (2 * num_of_neg_SV)
-    #positive noise 
-    positive_noise= np.where(((A <= 2)&(y == 1)))[0]
-    num_of_positive_noise = positive_noise.shape[0]
-    num_of_positive = np.where(y == 1)[0].shape[0]
-    C[positive_noise] = np.exp(num_of_positive_noise/num_of_positive)
+    A = 1 - y * (X.dot(w) + b)
+
+    bsv_mask = (A > 0) & (A < 2)
+    pos_bsv_mask = bsv_mask & (y == 1)
+    neg_bsv_mask = bsv_mask & (y == -1)
+
+    num_of_BSV = np.count_nonzero(bsv_mask)
+    num_of_pos_BSV = np.count_nonzero(pos_bsv_mask)
+    num_of_neg_BSV = np.count_nonzero(neg_bsv_mask)
+
+    if num_of_pos_BSV != 0:
+        C[pos_bsv_mask] = num_of_BSV / (2 * num_of_pos_BSV)
+    if num_of_neg_BSV != 0:
+        C[neg_bsv_mask] = num_of_BSV / (2 * num_of_neg_BSV)
+
+    sv_mask = (A == 0)
+    num_of_SV = np.count_nonzero(sv_mask)
+    if num_of_SV != 0:
+        pos_sv_mask = sv_mask & (y == 1)
+        neg_sv_mask = sv_mask & (y == -1)
+        num_of_pos_SV = np.count_nonzero(pos_sv_mask)
+        num_of_neg_SV = np.count_nonzero(neg_sv_mask)
+        if num_of_pos_SV != 0:
+            C[pos_sv_mask] = num_of_SV / (2 * num_of_pos_SV)
+        if num_of_neg_SV != 0:
+            C[neg_sv_mask] = num_of_SV / (2 * num_of_neg_SV)
+
+    positive_noise_mask = (A <= 2) & (y == 1)
+    num_of_positive_noise = np.count_nonzero(positive_noise_mask)
+    num_of_positive = np.count_nonzero(y == 1)
+    C[positive_noise_mask] = np.exp(num_of_positive_noise / num_of_positive)
 
     return C
 

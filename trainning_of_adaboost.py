@@ -37,6 +37,7 @@ def fit(
     b = []
     #creat list of cofident
     alpha = []
+    unit_weight = np.ones(N)
     
     if instance_categorization is True:
         B_ada = methods.intinitialization_instance_categorization(N) 
@@ -46,7 +47,7 @@ def fit(
             if test_something == False:
                 wi, bi = svm.fit(X, y, C , distribution_weight= WC)
             else: 
-                wi, bi = svm.fit(X, y, C , distribution_weight= np.ones(N))
+                wi, bi = svm.fit(X, y, C , distribution_weight= unit_weight)
             # Append wi and bi to the list
             w.append(wi)
             b.append(bi)
@@ -79,7 +80,7 @@ def fit(
             if test_something == False:
                 wi, bi = svm.fit(X, y, C , distribution_weight= W_ada)
             else :
-                wi, bi = svm.fit(X, y, C , distribution_weight= np.ones(N))            # Append wi and bi to the list 
+                wi, bi = svm.fit(X, y, C , distribution_weight= unit_weight)            # Append wi and bi to the list 
             w.append(wi)
             b.append(bi)
             
@@ -109,7 +110,15 @@ def fit(
             
 
 def predict(X,  w, b, alpha, M =10):
-    H = np.zeros(X.shape[0])
-    for i in range (M):
-        H += alpha[i]*(X.dot(w[i]) +b[i])
+    loops = min(M, len(alpha), len(w), len(b))
+    if loops <= 0:
+        return np.sign(np.zeros(X.shape[0]))
+
+    w_stack = np.asarray(w[:loops])
+    b_vec = np.asarray(b[:loops])
+    alpha_vec = np.asarray(alpha[:loops])
+
+    margins = X.dot(w_stack.T) + b_vec
+    weak_votes = np.sign(margins)
+    H = weak_votes.dot(alpha_vec)
     return np.sign(H)
